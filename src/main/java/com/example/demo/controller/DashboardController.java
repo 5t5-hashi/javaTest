@@ -52,26 +52,62 @@ public class DashboardController {
         yesterdayQuery.ge("create_time", startOfYesterday).le("create_time", endOfYesterday);
         List<Order> yesterdayOrders = orderMapper.selectList(yesterdayQuery);
 
-        // 4. 计算指标：今日订单数
+        // 4. 计算过去7天的数据趋势
+        List<Object> orderTrend = new java.util.ArrayList<>();
+        List<Object> revenueTrend = new java.util.ArrayList<>();
+        List<Object> customerTrend = new java.util.ArrayList<>();
+
+        for (int i = 6; i >= 0; i--) {
+            LocalDate date = LocalDate.now().minusDays(i);
+            LocalDateTime start = LocalDateTime.of(date, LocalTime.MIN);
+            LocalDateTime end = LocalDateTime.of(date, LocalTime.MAX);
+            
+            QueryWrapper<Order> dayQuery = new QueryWrapper<>();
+            dayQuery.ge("create_time", start).le("create_time", end);
+            List<Order> dayOrders = orderMapper.selectList(dayQuery);
+            
+            // 订单数
+            long count = dayOrders.size();
+            orderTrend.add(count);
+            
+            // 营收
+            BigDecimal revenue = dayOrders.stream()
+                    .map(Order::getTotalAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            revenueTrend.add(revenue);
+            
+            // 客单价
+            BigDecimal perCustomer = count > 0 ? revenue.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+            customerTrend.add(perCustomer);
+        }
+
+        // 5. 计算指标：今日订单数
         long todayOrderCount = todayOrders.size();
         long yesterdayOrderCount = yesterdayOrders.size();
-        response.setTodayOrder(buildStatItem(todayOrderCount, yesterdayOrderCount));
+        StatItem orderItem = buildStatItem(todayOrderCount, yesterdayOrderCount);
+        orderItem.setDataList(orderTrend);
+        response.setTodayOrder(orderItem);
 
-        // 5. 计算指标：今日营收
+        // 6. 计算指标：今日营收
         BigDecimal todayRevenue = todayOrders.stream()
                 .map(Order::getTotalAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
         BigDecimal yesterdayRevenue = yesterdayOrders.stream()
                 .map(Order::getTotalAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        response.setTodayRevenue(buildStatItem(todayRevenue, yesterdayRevenue));
+        StatItem revenueItem = buildStatItem(todayRevenue, yesterdayRevenue);
+        revenueItem.setDataList(revenueTrend);
+        response.setTodayRevenue(revenueItem);
 
-        // 6. 计算指标：客单价
+        // 7. 计算指标：客单价
         BigDecimal todayPerCustomer = todayOrderCount > 0 ? todayRevenue.divide(BigDecimal.valueOf(todayOrderCount), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
         BigDecimal yesterdayPerCustomer = yesterdayOrderCount > 0 ? yesterdayRevenue.divide(BigDecimal.valueOf(yesterdayOrderCount), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
-        response.setPerCustomerTransaction(buildStatItem(todayPerCustomer, yesterdayPerCustomer));
+        StatItem customerItem = buildStatItem(todayPerCustomer, yesterdayPerCustomer);
+        customerItem.setDataList(customerTrend);
+        response.setPerCustomerTransaction(customerItem);
 
-        // 7. 计算指标：库存预警
+        // 8. 计算指标：库存预警
         QueryWrapper<Product> warningQuery = new QueryWrapper<>();
         warningQuery.apply("stock < warning_threshold");
         Long warningCount = productMapper.selectCount(warningQuery);
@@ -79,6 +115,16 @@ public class DashboardController {
         StatItem inventoryItem = new StatItem();
         inventoryItem.setValue(warningCount);
         inventoryItem.setComparison(0.0);
+        
+        // 库存历史通常需要快照表，这里模拟数据：假设过去6天都和今天一样（或者随机波动一下）
+        List<Object> inventoryTrend = new java.util.ArrayList<>();
+        for(int i=0; i<6; i++) {
+             // 简单模拟：用当前值稍微波动一下，或者直接填当前值
+             inventoryTrend.add(warningCount); 
+        }
+        inventoryTrend.add(warningCount);
+        inventoryItem.setDataList(inventoryTrend);
+        
         response.setInventoryWarning(inventoryItem);
 
         return response;
@@ -117,5 +163,6 @@ public class DashboardController {
     public static class StatItem {
         private Object value;     // 可能是 Long (订单数) 也可能是 BigDecimal (金额)
         private Double comparison; // 增长率
+        private List<Object> dataList; // 7天趋势数据
     }
 }

@@ -40,7 +40,7 @@
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-            <version>3.5.9</version>
+            <version>3.5.5</version>
         </dependency>
 
         <!-- MySQL 驱动：连接 MySQL 数据库必须 -->

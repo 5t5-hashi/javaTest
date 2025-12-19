@@ -49,7 +49,17 @@ public class AuthController {
                 
                 // 设置菜单列表
                 List<MenuItem> menuList = new ArrayList<>();
-                menuList.add(new MenuItem("/dashboard/index", "仪表盘"));
+                
+                // 1. 仪表盘
+                menuList.add(new MenuItem("/dashboard/index", "仪表盘", null));
+                
+                // 2. 商品管理
+                List<MenuItem> productChildren = new ArrayList<>();
+                productChildren.add(new MenuItem("/productManagement/list", "商品列表", null));
+                productChildren.add(new MenuItem("/productManagement/categories", "分类管理", null));
+                productChildren.add(new MenuItem("/productManagement/brands", "品牌管理", null));
+                
+                menuList.add(new MenuItem("/productManagement", "商品管理", productChildren));
                 
                 // 简单的权限控制演示
                 if ("admin".equals(user.getRole())) {
@@ -91,5 +101,6 @@ public class AuthController {
     public static class MenuItem {
         private String key;
         private String label;
+        private List<MenuItem> children;
     }
 }
